@@ -66,11 +66,6 @@ class Config:
 
 config = Config()
 
-if not os.path.exists(config.WORK_DIR):
-    print(f"Creating working directory at: {config.WORK_DIR}")
-    os.makedirs(config.WORK_DIR)
-
-
 print(f"Configuration loaded:")
 print(f"  - Target classes: {config.TARGET_CLASSES}")
 print(f"  - Number of classes: {config.NUM_CLASSES}")
@@ -136,6 +131,8 @@ def filter_dataset_classes(source_dir, dest_dir, target_classes):
 # Copy and filter dataset
 if not os.path.exists(config.WORK_DIR):
  # Create output directory for results
+    print(f"Creating working directory at: {config.WORK_DIR}")
+    os.makedirs(config.WORK_DIR)
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
     os.makedirs(config.MODELS_DIR, exist_ok=True)
     os.makedirs(config.DATASET_DIR, exist_ok=True)
