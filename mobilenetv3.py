@@ -53,7 +53,7 @@ class Config:
     DATASET_DIR = '/kaggle/working/dataset'
     
     # Target classes for filtering (4 out of 10 classes)
-    TARGET_CLASSES = ['bacterial_leaf_blight', 'brown_spot', 'leaf_blast', 'rice_leaf_healthy']
+    TARGET_CLASSES = ['bacterial_leaf_blight', 'brown_spot', 'leaf_blast', 'healthy_rice_leaf']
     
     BATCH_SIZE = 16
     IMG_SIZE_MOBILE = 224
@@ -135,11 +135,12 @@ def filter_dataset_classes(source_dir, dest_dir, target_classes):
 
 # Copy and filter dataset
 if not os.path.exists(config.WORK_DIR):
-    print("Filtering and copying dataset to working directory...")
-    filter_dataset_classes(config.BASE_INPUT, config.WORK_DIR, config.TARGET_CLASSES)
-    # Create output directory for results
+ # Create output directory for results
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
     os.makedirs(config.MODELS_DIR, exist_ok=True)
+    os.makedirs(config.DATASET_DIR, exist_ok=True)
+    print("Filtering and copying dataset to working directory...")
+    filter_dataset_classes(config.BASE_INPUT, config.DATASET_DIR, config.TARGET_CLASSES)
 else:
     print("✓ Working directory already exists")
 
