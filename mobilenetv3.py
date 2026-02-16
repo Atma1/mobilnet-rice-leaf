@@ -60,7 +60,7 @@ class Config:
     
     # Model architecture
     DROPOUT_RATE = 0.5
-    NUM_CLASSES = len(TARGET_CLASSES)  # Updated for 4 classes
+    NUM_CLASSES = 4  # Updated for 4 classes
     
     SEED = 42
 
