@@ -50,6 +50,7 @@ class Config:
     WORK_DIR = '/kaggle/working/Rice_Leaf_Diease'
     OUTPUT_DIR = '/kaggle/working/results'
     MODELS_DIR = '/kaggle/working/models'
+    DATASET_DIR = '/kaggle/working/dataset'
     
     # Target classes for filtering (4 out of 10 classes)
     TARGET_CLASSES = ['bacterial_leaf_blight', 'brown_spot', 'leaf_blast', 'rice_leaf_healthy']
@@ -64,6 +65,11 @@ class Config:
     SEED = 42
 
 config = Config()
+
+if not os.path.exists(config.WORK_DIR):
+    print(f"Creating working directory at: {config.WORK_DIR}")
+    os.makedirs(config.WORK_DIR)
+
 
 print(f"Configuration loaded:")
 print(f"  - Target classes: {config.TARGET_CLASSES}")
@@ -322,7 +328,7 @@ for scenario in scenarios:
     try:
         # Create data generators for this split ratio
         train_gen, val_gen, class_indices = create_data_generators(
-            config.WORK_DIR,
+            config.DATASET_DIR,
             train_ratio=scenario['split_ratio'],
             img_size=config.IMG_SIZE_MOBILE,
             batch_size=config.BATCH_SIZE
