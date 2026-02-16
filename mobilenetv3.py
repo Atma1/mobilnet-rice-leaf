@@ -46,11 +46,11 @@ tf.random.set_seed(SEED)
 
 # ------------------ 1. CONFIGURATION ------------------
 class Config:
-    BASE_INPUT = '/kaggle/input/rice-leaf-diseases-detection/Rice_Leaf_Diease/Rice_Leaf_Diease'
-    WORK_DIR = '/kaggle/working/Rice_Leaf_Diease'
-    OUTPUT_DIR = '/kaggle/working/results'
-    MODELS_DIR = '/kaggle/working/models'
-    DATASET_DIR = '/kaggle/working/dataset'
+    BASE_INPUT = '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/dataset/Rice_Leaf_AUG/Rice_Leaf_AUG'
+    WORK_DIR = '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/work'
+    OUTPUT_DIR = '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/work/results'
+    MODELS_DIR =  '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/work/models'
+    DATASET_DIR =  '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/work/dataset'
     
     # Target classes for filtering (4 out of 10 classes)
     TARGET_CLASSES = ['bacterial_leaf_blight', 'brown_spot', 'leaf_blast', 'healthy_rice_leaf']
