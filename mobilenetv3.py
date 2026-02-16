@@ -65,9 +65,6 @@ class Config:
 
 config = Config()
 
-# Create output directory for results
-os.makedirs(config.OUTPUT_DIR, exist_ok=True)
-
 print(f"Configuration loaded:")
 print(f"  - Target classes: {config.TARGET_CLASSES}")
 print(f"  - Number of classes: {config.NUM_CLASSES}")
@@ -80,6 +77,28 @@ print(f"  - Output directory: {config.OUTPUT_DIR}")
 # ======================================================================
 
 # ------------------ 2. DATASET FILTERING & PREPARATION ------------------
+def normalize_class_name(name):
+    """
+    Normalize folder names to snake_case (lowercase, underscores).
+    """
+    normalized = name.strip().lower().replace(" ", "_").replace("-", "_")
+    normalized = "".join(ch for ch in normalized if ch.isalnum() or ch == "_")
+    while "__" in normalized:
+        normalized = normalized.replace("__", "_")
+    return normalized.strip("_")
+
+def build_normalized_dir_map(source_dir):
+    """
+    Map normalized folder names to their actual folder names in source_dir.
+    """
+    if not os.path.exists(source_dir):
+        return {}
+    mapping = {}
+    for entry in os.listdir(source_dir):
+        entry_path = os.path.join(source_dir, entry)
+        if os.path.isdir(entry_path):
+            mapping[normalize_class_name(entry)] = entry
+    return mapping
 
 def filter_dataset_classes(source_dir, dest_dir, target_classes):
     """
@@ -90,15 +109,21 @@ def filter_dataset_classes(source_dir, dest_dir, target_classes):
     if not os.path.exists(source_dir) and not os.path.exists(dest_dir):
         return
         
+    source_map = build_normalized_dir_map(source_dir)
+        
     for class_name in target_classes:
-        source_class = os.path.join(source_dir, class_name)
-        dest_class = os.path.join(dest_dir, class_name)
+        normalized_name = normalize_class_name(class_name)
+        source_folder = source_map.get(normalized_name)
+        if not source_folder:
+            continue
+        source_class = os.path.join(source_dir, source_folder)
+        dest_class = os.path.join(dest_dir, normalized_name)
         
         if os.path.exists(source_class):
             os.makedirs(dest_class, exist_ok=True)
             if not os.listdir(dest_class):  # Only copy if destination is empty
                 shutil.copytree(source_class, dest_class, dirs_exist_ok=True)
-                print(f"  Copied {class_name} from {source_dir} to {dest_dir}/")
+                print(f"  Copied {source_folder} to {dest_class}/")
     
     print(f"✓ Dataset filtered to {len(target_classes)} classes")
 
@@ -106,9 +131,11 @@ def filter_dataset_classes(source_dir, dest_dir, target_classes):
 if not os.path.exists(config.WORK_DIR):
     print("Filtering and copying dataset to working directory...")
     filter_dataset_classes(config.BASE_INPUT, config.WORK_DIR, config.TARGET_CLASSES)
+    # Create output directory for results
+    os.makedirs(config.OUTPUT_DIR, exist_ok=True)
+    os.makedirs(config.MODELS_DIR, exist_ok=True)
 else:
     print("✓ Working directory already exists")
-
 
 # ======================================================================
 # CODE CELL 4
