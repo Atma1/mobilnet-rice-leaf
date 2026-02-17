@@ -406,7 +406,7 @@ for scenario in scenarios:
         os.makedirs(config.MODELS_DIR, exist_ok=True)
         scenario_model_path = os.path.join(
             config.MODELS_DIR, 
-            f"model_scenario_{scenario['id']:02d}_{scenario['split_name'].replace(':', '-')}_{scenario['optimizer']}_lr{scenario['learning_rate']}.h5"
+            f"model_scenario_{scenario['id']:02d}_{scenario['split_name'].replace(':', '-')}_{scenario['optimizer']}_lr{scenario['learning_rate']}.keras"
         )
         model.save(scenario_model_path)
         print(f"    ✓ Model saved: {scenario_model_path}")
@@ -415,7 +415,7 @@ for scenario in scenarios:
         if final_val_acc > best_val_acc:
             best_val_acc = final_val_acc
             best_scenario_id = scenario['id']
-            best_model_path = os.path.join(config.MODELS_DIR, 'best_model.h5')
+            best_model_path = os.path.join(config.MODELS_DIR, 'best_model.keras')
             model.save(best_model_path)
             print(f"    ✓ New best model saved: {best_model_path}")
         
@@ -633,7 +633,7 @@ if len(successful_results) > 0:
         )
         
         os.makedirs(config.MODELS_DIR, exist_ok=True)
-        best_model_path = os.path.join(config.MODELS_DIR, 'best_model.h5')
+        best_model_path = os.path.join(config.MODELS_DIR, 'best_model.keras')
         best_model.save(best_model_path)
         print(f"\n✓ Best model saved: {best_model_path}")
     
