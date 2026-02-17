@@ -207,9 +207,14 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
     # Get class names
     class_names = train_ds.class_names
     
-    # Calculate actual sample counts by iterating over batches
-    train_samples = sum(x.shape[0] for x, y in train_ds)
-    val_samples = sum(x.shape[0] for x, y in val_ds)
+    # Count total images in directory
+    import glob
+    total_samples = sum(len(glob.glob(os.path.join(data_dir, class_name, '*'))) 
+                       for class_name in class_names)
+    
+    # Calculate split counts
+    train_samples = int(total_samples * train_ratio)
+    val_samples = total_samples - train_samples
     
     # Apply preprocessing
     train_ds = train_ds.map(preprocess_mobile, AUTOTUNE).shuffle(1000).prefetch(AUTOTUNE)
