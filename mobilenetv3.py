@@ -194,13 +194,12 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
     
     # Calculate split sizes
     val_size = int((1 - train_ratio) * len(full_train_ds_mobile))
-    val_ds_mobile = full_train_ds_mobile.take(val_size)
-    train_ds_mobile = full_train_ds_mobile.skip(val_size)
+    train_ds_mobile = full_train_ds_mobile.take(len(full_train_ds_mobile) - val_size)
+    val_ds_mobile = full_train_ds_mobile.skip(len(full_train_ds_mobile) - val_size)
     
-    # Count total samples (batches * batch_size approximation)
-    total_batches = len(full_train_ds_mobile)
-    train_samples = (total_batches - val_size) * batch_size
-    val_samples = val_size * batch_size
+    # Count total samples (using actual dataset lengths)
+    train_samples = len(train_ds_mobile) * batch_size
+    val_samples = len(val_ds_mobile) * batch_size
     
     # Apply preprocessing
     train_ds = train_ds_mobile.map(preprocess_mobile, AUTOTUNE).shuffle(1000).prefetch(AUTOTUNE)
