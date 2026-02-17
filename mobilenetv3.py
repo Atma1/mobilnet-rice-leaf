@@ -70,7 +70,7 @@ class Config:
 
 config = Config()
 
-print(f"Configuration loaded:")
+print("Configuration loaded:")
 print(f"  - Target classes: {config.TARGET_CLASSES}")
 print(f"  - Number of classes: {config.NUM_CLASSES}")
 print(f"  - Image size: {config.IMG_SIZE_MOBILE}x{config.IMG_SIZE_MOBILE}")
@@ -463,9 +463,9 @@ for scenario in scenarios:
         print(f"\n  ✓ Scenario {scenario['id']} completed!")
         print(f"    Final Train Accuracy: {final_train_acc:.4f}")
         print(f"    Final Val Accuracy: {final_val_acc:.4f}")
-        print("     Precision: {precision:.4f}")
-        print("     Recall: {recall:.4f}")
-        print("     f1_score: {f1:.4f}")
+        print(f"     Precision: {precision:.4f}")
+        print(f"     Recall: {recall:.4f}")
+        print(f"     f1_score: {f1:.4f}")
         
         # Save model for this scenario in models directory
         os.makedirs(config.MODELS_DIR, exist_ok=True)
@@ -548,7 +548,7 @@ else:
     with open(history_json, 'w') as f:
         json.dump(successful_results, f, indent=2, default=str)
     
-    print(f"\n✓ Results saved:")
+    print("\n✓ Results saved:")
     print(f"  - CSV: {results_csv}")
     print(f"  - JSON: {history_json}")
     
@@ -756,7 +756,7 @@ if len(successful_results) > 0:
     
     # Print classification report
     print("\nClassification Report:")
-    print(classification_report(y_true, y_pred_classes, target_names=class_names))
+    print(classification_report(y_true, y_pred_classes, target_names=class_names, labels=np.arange(len(class_names))))
     
     # Cleanup
     del best_model
