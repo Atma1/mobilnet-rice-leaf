@@ -171,7 +171,7 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
     Uses tf.data.Dataset instead of ImageDataGenerator.
     
     Args:
-        data_dir: Data directory path
+        data_dir: Data directory path (should be config.DATASET_DIR)
         train_ratio: Ratio for training (e.g., 0.9 for 90:10 split)
         img_size: Target image size
         batch_size: Batch size for datasets
@@ -179,46 +179,32 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
     Returns:
         train_ds, val_ds, class_names
     """
-    # Calculate validation split
-    validation_split = 1.0 - train_ratio
-    
-    # Create training dataset
-    train_ds = tf.keras.utils.image_dataset_from_directory(
+    # Create full dataset from config.DATASET_DIR
+    full_train_ds_mobile = tf.keras.utils.image_dataset_from_directory(
         data_dir,
-        validation_split=validation_split,
-        subset='training',
-        seed=SEED,
         image_size=(img_size, img_size),
         batch_size=batch_size,
-        shuffle=True
-    )
-    
-    # Create validation dataset  
-    val_ds = tf.keras.utils.image_dataset_from_directory(
-        data_dir,
-        validation_split=validation_split,
-        subset='validation',
-        seed=SEED,
-        image_size=(img_size, img_size),
-        batch_size=batch_size,
-        shuffle=False
+        label_mode='categorical',
+        shuffle=True,
+        seed=SEED
     )
     
     # Get class names
-    class_names = train_ds.class_names
+    class_names = full_train_ds_mobile.class_names
     
-    # Count total images in directory
-    import glob
-    total_samples = sum(len(glob.glob(os.path.join(data_dir, class_name, '*'))) 
-                       for class_name in class_names)
+    # Calculate split sizes
+    val_size = int((1 - train_ratio) * len(full_train_ds_mobile))
+    val_ds_mobile = full_train_ds_mobile.take(val_size)
+    train_ds_mobile = full_train_ds_mobile.skip(val_size)
     
-    # Calculate split counts
-    train_samples = int(total_samples * train_ratio)
-    val_samples = total_samples - train_samples
+    # Count total samples (batches * batch_size approximation)
+    total_batches = len(full_train_ds_mobile)
+    train_samples = (total_batches - val_size) * batch_size
+    val_samples = val_size * batch_size
     
     # Apply preprocessing
-    train_ds = train_ds.map(preprocess_mobile, AUTOTUNE).shuffle(1000).prefetch(AUTOTUNE)
-    val_ds = val_ds.map(preprocess_mobile, AUTOTUNE)
+    train_ds = train_ds_mobile.map(preprocess_mobile, AUTOTUNE).shuffle(1000).prefetch(AUTOTUNE)
+    val_ds = val_ds_mobile.map(preprocess_mobile, AUTOTUNE)
     
     # Store sample counts in a way compatible with existing code
     # We wrap the dataset and add a samples property
