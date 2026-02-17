@@ -207,9 +207,9 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
     # Get class names
     class_names = train_ds.class_names
     
-    # Calculate sample counts efficiently using cardinality
-    train_samples = tf.data.experimental.cardinality(train_ds).numpy() * batch_size
-    val_samples = tf.data.experimental.cardinality(val_ds).numpy() * batch_size
+    # Calculate actual sample counts by iterating over batches
+    train_samples = sum(x.shape[0] for x, y in train_ds)
+    val_samples = sum(x.shape[0] for x, y in val_ds)
     
     # Apply preprocessing
     train_ds = train_ds.map(preprocess_mobile, AUTOTUNE).shuffle(1000).prefetch(AUTOTUNE)
