@@ -193,7 +193,7 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
         shuffle=True
     )
     
-    # Create validation dataset
+    # Create validation dataset  
     val_ds = tf.keras.utils.image_dataset_from_directory(
         data_dir,
         validation_split=validation_split,
@@ -207,19 +207,31 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
     # Get class names
     class_names = train_ds.class_names
     
-    # Calculate sample counts before applying preprocessing
-    train_samples = sum(1 for _ in train_ds.unbatch())
-    val_samples = sum(1 for _ in val_ds.unbatch())
+    # Calculate sample counts efficiently using cardinality
+    train_samples = tf.data.experimental.cardinality(train_ds).numpy() * batch_size
+    val_samples = tf.data.experimental.cardinality(val_ds).numpy() * batch_size
     
     # Apply preprocessing
     train_ds = train_ds.map(preprocess_mobile, AUTOTUNE).shuffle(1000).prefetch(AUTOTUNE)
     val_ds = val_ds.map(preprocess_mobile, AUTOTUNE)
     
-    # Add attributes to match ImageDataGenerator interface
-    train_ds.samples = train_samples
-    val_ds.samples = val_samples
+    # Store sample counts in a way compatible with existing code
+    # We wrap the dataset and add a samples property
+    class DatasetWithSamples:
+        def __init__(self, dataset, samples):
+            self._dataset = dataset
+            self.samples = samples
+        
+        def __iter__(self):
+            return iter(self._dataset)
+        
+        def __getattr__(self, name):
+            return getattr(self._dataset, name)
     
-    return train_ds, val_ds, class_names
+    train_ds_wrapper = DatasetWithSamples(train_ds, train_samples)
+    val_ds_wrapper = DatasetWithSamples(val_ds, val_samples)
+    
+    return train_ds_wrapper, val_ds_wrapper, class_names
 
 print("✓ Data generator function ready")
 
@@ -415,11 +427,23 @@ for scenario in scenarios:
         }
         
         # Calculate precision, recall, F1 score on validation set
+        # Make predictions on validation set
         y_pred = model.predict(val_gen, verbose=0)
         y_pred_classes = np.argmax(y_pred, axis=1)
         
-        # Extract true labels from validation dataset
-        y_true = np.concatenate([y for x, y in val_gen], axis=0)
+        # Recreate validation dataset to extract labels (predict consumed the dataset)
+        val_ds_for_labels = tf.keras.utils.image_dataset_from_directory(
+            config.DATASET_DIR,
+            validation_split=1.0 - scenario['split_ratio'],
+            subset='validation',
+            seed=SEED,
+            image_size=(config.IMG_SIZE_MOBILE, config.IMG_SIZE_MOBILE),
+            batch_size=config.BATCH_SIZE,
+            shuffle=False
+        )
+        
+        # Extract true labels
+        y_true = np.concatenate([y for x, y in val_ds_for_labels], axis=0)
         y_true = np.argmax(y_true, axis=1)[:len(y_pred_classes)]
         
         # Calculate metrics (weighted average for multi-class)
@@ -676,14 +700,23 @@ if len(successful_results) > 0:
     y_pred = best_model.predict(val_gen, verbose=0)
     y_pred_classes = np.argmax(y_pred, axis=1)
     
-    # Extract true labels from validation dataset
-    y_true = np.concatenate([y for x, y in val_gen], axis=0)
+    # Recreate validation dataset to extract labels (predict consumed the dataset)
+    val_ds_for_labels = tf.keras.utils.image_dataset_from_directory(
+        config.WORK_DIR,
+        validation_split=1.0 - split_num,
+        subset='validation',
+        seed=SEED,
+        image_size=(config.IMG_SIZE_MOBILE, config.IMG_SIZE_MOBILE),
+        batch_size=config.BATCH_SIZE,
+        shuffle=False
+    )
+    
+    # Extract true labels
+    y_true = np.concatenate([y for x, y in val_ds_for_labels], axis=0)
     y_true = np.argmax(y_true, axis=1)[:len(y_pred_classes)]
     
     # Confusion matrix
     cm = confusion_matrix(y_true, y_pred_classes)
-    
-    # class_names already available from create_data_generators
     
     # Plot confusion matrix
     plt.figure(figsize=(10, 8))
