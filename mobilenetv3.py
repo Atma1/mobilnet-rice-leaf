@@ -60,6 +60,7 @@ class Config:
     
     # Model architecture
     DROPOUT_RATE = 0.5
+    DENSE_UNITS = 128
     NUM_CLASSES = 4  # Updated for 4 classes
     
     SEED = 42
@@ -276,8 +277,11 @@ def build_feature_extraction_model(num_classes, img_size, optimizer_name, learni
     model = models.Sequential([
         base_model,
         layers.GlobalAveragePooling2D(),
+        layers.BatchNormalization(),
         layers.Dropout(dropout_rate),
-        layers.Dense(num_classes, activation='softmax', name='output')
+        layers.Dense(config.DENSE_UNITS, activation='relu'),
+        layers.Dropout(0.3),
+        layers.Dense(num_classes, activation='softmax')
     ])
     
     # Select optimizer
