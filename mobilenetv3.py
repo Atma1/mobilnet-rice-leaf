@@ -12,7 +12,7 @@ All functionality is the same except visualizations are saved instead of shown.
 
 import sys
 import subprocess
-
+import traceback
 
 import os
 
@@ -441,7 +441,13 @@ for scenario in scenarios:
         for x, y in val_ds_for_labels:
             y_true_batches.append(y.numpy())
         y_true = np.concatenate(y_true_batches, axis=0)
-        y_true = np.argmax(y_true, axis=1)[:len(y_pred_classes)]
+        
+        # Convert to class indices if one-hot encoded
+        if len(y_true.shape) > 1 and y_true.shape[1] > 1:
+            y_true = np.argmax(y_true, axis=1)
+        
+        # Ensure we match the prediction length
+        y_true = y_true[:len(y_pred_classes)]
         
         # Calculate metrics (weighted average for multi-class)
         precision, recall, f1, _ = precision_recall_fscore_support(
@@ -457,6 +463,9 @@ for scenario in scenarios:
         print(f"\n  ✓ Scenario {scenario['id']} completed!")
         print(f"    Final Train Accuracy: {final_train_acc:.4f}")
         print(f"    Final Val Accuracy: {final_val_acc:.4f}")
+        print("     Precision: {precision:.4f}")
+        print("     Recall: {recall:.4f}")
+        print("     f1_score: {f1:.4f}")
         
         # Save model for this scenario in models directory
         os.makedirs(config.MODELS_DIR, exist_ok=True)
@@ -483,13 +492,16 @@ for scenario in scenarios:
         
     except Exception as e:
         print(f"\n  ✗ Scenario {scenario['id']} failed: {str(e)}")
+        print("\nFull traceback:")
+        traceback.print_exc()
         results.append({
             'scenario_id': scenario['id'],
             'split_ratio': scenario['split_name'],
             'optimizer': scenario['optimizer'],
             'learning_rate': scenario['learning_rate'],
             'epochs': scenario['epochs'],
-            'error': str(e)
+            'error': str(e),
+            'traceback': traceback.format_exc()
         })
 
 print(f"\n{'='*70}")
@@ -713,7 +725,13 @@ if len(successful_results) > 0:
     for x, y in val_ds_for_labels:
         y_true_batches.append(y.numpy())
     y_true = np.concatenate(y_true_batches, axis=0)
-    y_true = np.argmax(y_true, axis=1)[:len(y_pred_classes)]
+    
+    # Convert to class indices if one-hot encoded
+    if len(y_true.shape) > 1 and y_true.shape[1] > 1:
+        y_true = np.argmax(y_true, axis=1)
+    
+    # Ensure we match the prediction length
+    y_true = y_true[:len(y_pred_classes)]
     
     # Confusion matrix
     cm = confusion_matrix(y_true, y_pred_classes)
