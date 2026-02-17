@@ -30,8 +30,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import classification_report, confusion_matrix, precision_recall_fscore_support
 from tensorflow.keras.applications import MobileNetV3Large
+from tensorflow.keras.applications.mobilenet_v3 import preprocess_input as preprocess_mobilenet
 from tensorflow.keras import layers, models, optimizers, callbacks
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from pathlib import Path
 import json
 from datetime import datetime
@@ -43,6 +43,9 @@ SEED = 42
 random.seed(SEED)
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
+
+# Define AUTOTUNE for performance optimization
+AUTOTUNE = tf.data.AUTOTUNE
 
 # ------------------ 1. CONFIGURATION ------------------
 class Config:
@@ -148,49 +151,75 @@ else:
 
 # ------------------ 3. DATA SPLITTING & GENERATORS ------------------
 
-def create_data_generators(data_dir, train_ratio, img_size, batch_size):
+def preprocess_mobile(img, label):
     """
-    Create train/validation data generators with specified split ratio.
-    Merges train+test, then splits based on train_ratio.
+    Preprocess images using MobileNetV3 preprocessing.
     
     Args:
-        train_dir: Original training directory
-        test_dir: Original test directory (will be merged with train)
-        train_ratio: Ratio for training (e.g., 0.9 for 90:10 split)
-        img_size: Target image size
-        batch_size: Batch size for generators
+        img: Input image tensor
+        label: Label tensor
     
     Returns:
-        train_generator, val_generator, class_indices
+        Preprocessed image and label
     """
-    # Only rescale, no augmentation
-    datagen = ImageDataGenerator(
-        rescale=1./255,
-        validation_split=1.0 - train_ratio  # validation_split is the % for validation
-    )
+    img = preprocess_mobilenet(img)
+    return img, label
+
+def create_data_generators(data_dir, train_ratio, img_size, batch_size):
+    """
+    Create train/validation datasets with specified split ratio.
+    Uses tf.data.Dataset instead of ImageDataGenerator.
     
-    # Use train directory for both train and validation (with validation_split)
-    train_generator = datagen.flow_from_directory(
+    Args:
+        data_dir: Data directory path
+        train_ratio: Ratio for training (e.g., 0.9 for 90:10 split)
+        img_size: Target image size
+        batch_size: Batch size for datasets
+    
+    Returns:
+        train_ds, val_ds, class_names
+    """
+    # Calculate validation split
+    validation_split = 1.0 - train_ratio
+    
+    # Create training dataset
+    train_ds = tf.keras.utils.image_dataset_from_directory(
         data_dir,
-        target_size=(img_size, img_size),
-        batch_size=batch_size,
-        class_mode='categorical',
+        validation_split=validation_split,
         subset='training',
-        shuffle=True,
-        seed=SEED
-    )
-    
-    val_generator = datagen.flow_from_directory(
-        data_dir,
-        target_size=(img_size, img_size),
+        seed=SEED,
+        image_size=(img_size, img_size),
         batch_size=batch_size,
-        class_mode='categorical',
-        subset='validation',
-        shuffle=False,
-        seed=SEED
+        shuffle=True
     )
     
-    return train_generator, val_generator, train_generator.class_indices
+    # Create validation dataset
+    val_ds = tf.keras.utils.image_dataset_from_directory(
+        data_dir,
+        validation_split=validation_split,
+        subset='validation',
+        seed=SEED,
+        image_size=(img_size, img_size),
+        batch_size=batch_size,
+        shuffle=False
+    )
+    
+    # Get class names
+    class_names = train_ds.class_names
+    
+    # Calculate sample counts before applying preprocessing
+    train_samples = sum(1 for _ in train_ds.unbatch())
+    val_samples = sum(1 for _ in val_ds.unbatch())
+    
+    # Apply preprocessing
+    train_ds = train_ds.map(preprocess_mobile, AUTOTUNE).shuffle(1000).prefetch(AUTOTUNE)
+    val_ds = val_ds.map(preprocess_mobile, AUTOTUNE)
+    
+    # Add attributes to match ImageDataGenerator interface
+    train_ds.samples = train_samples
+    val_ds.samples = val_samples
+    
+    return train_ds, val_ds, class_names
 
 print("✓ Data generator function ready")
 
@@ -329,7 +358,7 @@ for scenario in scenarios:
     
     try:
         # Create data generators for this split ratio
-        train_gen, val_gen, class_indices = create_data_generators(
+        train_gen, val_gen, class_names = create_data_generators(
             config.DATASET_DIR,
             train_ratio=scenario['split_ratio'],
             img_size=config.IMG_SIZE_MOBILE,
@@ -386,10 +415,12 @@ for scenario in scenarios:
         }
         
         # Calculate precision, recall, F1 score on validation set
-        val_gen.reset()
         y_pred = model.predict(val_gen, verbose=0)
         y_pred_classes = np.argmax(y_pred, axis=1)
-        y_true = val_gen.classes[:len(y_pred_classes)]
+        
+        # Extract true labels from validation dataset
+        y_true = np.concatenate([y for x, y in val_gen], axis=0)
+        y_true = np.argmax(y_true, axis=1)[:len(y_pred_classes)]
         
         # Calculate metrics (weighted average for multi-class)
         precision, recall, f1, _ = precision_recall_fscore_support(
@@ -601,7 +632,7 @@ if len(successful_results) > 0:
         split_num = best_result['split_ratio']
     
     # Recreate data generators for best scenario
-    train_gen, val_gen, class_indices = create_data_generators(
+    train_gen, val_gen, class_names = create_data_generators(
         config.WORK_DIR,
         train_ratio=split_num,
         img_size=config.IMG_SIZE_MOBILE,
@@ -642,16 +673,17 @@ if len(successful_results) > 0:
         print(f"\n✓ Best model saved: {best_model_path}")
     
     # Generate predictions
-    val_gen.reset()
     y_pred = best_model.predict(val_gen, verbose=0)
     y_pred_classes = np.argmax(y_pred, axis=1)
-    y_true = val_gen.classes[:len(y_pred_classes)]
+    
+    # Extract true labels from validation dataset
+    y_true = np.concatenate([y for x, y in val_gen], axis=0)
+    y_true = np.argmax(y_true, axis=1)[:len(y_pred_classes)]
     
     # Confusion matrix
     cm = confusion_matrix(y_true, y_pred_classes)
     
-    # Get class names
-    class_names = list(class_indices.keys())
+    # class_names already available from create_data_generators
     
     # Plot confusion matrix
     plt.figure(figsize=(10, 8))
