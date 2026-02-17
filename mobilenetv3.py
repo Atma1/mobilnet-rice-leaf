@@ -437,7 +437,10 @@ for scenario in scenarios:
         )
         
         # Extract true labels
-        y_true = np.concatenate([y for x, y in val_ds_for_labels], axis=0)
+        y_true_batches = []
+        for x, y in val_ds_for_labels:
+            y_true_batches.append(y.numpy())
+        y_true = np.concatenate(y_true_batches, axis=0)
         y_true = np.argmax(y_true, axis=1)[:len(y_pred_classes)]
         
         # Calculate metrics (weighted average for multi-class)
@@ -706,7 +709,10 @@ if len(successful_results) > 0:
     )
     
     # Extract true labels
-    y_true = np.concatenate([y for x, y in val_ds_for_labels], axis=0)
+    y_true_batches = []
+    for x, y in val_ds_for_labels:
+        y_true_batches.append(y.numpy())
+    y_true = np.concatenate(y_true_batches, axis=0)
     y_true = np.argmax(y_true, axis=1)[:len(y_pred_classes)]
     
     # Confusion matrix
