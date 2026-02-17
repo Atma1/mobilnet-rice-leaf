@@ -197,31 +197,21 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
     train_ds_mobile = full_train_ds_mobile.take(len(full_train_ds_mobile) - val_size)
     val_ds_mobile = full_train_ds_mobile.skip(len(full_train_ds_mobile) - val_size)
     
-    # Count total samples (using actual dataset lengths)
-    train_samples = len(train_ds_mobile) * batch_size
-    val_samples = len(val_ds_mobile) * batch_size
-    
     # Apply preprocessing
     train_ds = train_ds_mobile.map(preprocess_mobile, AUTOTUNE).shuffle(1000).prefetch(AUTOTUNE)
     val_ds = val_ds_mobile.map(preprocess_mobile, AUTOTUNE)
-    
-    # Store sample counts in a way compatible with existing code
-    # We wrap the dataset and add a samples property
-    class DatasetWithSamples:
-        def __init__(self, dataset, samples):
-            self._dataset = dataset
-            self.samples = samples
-        
-        def __iter__(self):
-            return iter(self._dataset)
-        
-        def __getattr__(self, name):
-            return getattr(self._dataset, name)
-    
-    train_ds_wrapper = DatasetWithSamples(train_ds, train_samples)
-    val_ds_wrapper = DatasetWithSamples(val_ds, val_samples)
-    
-    return train_ds_wrapper, val_ds_wrapper, class_names
+
+    return train_ds, val_ds, class_names
+
+def estimate_samples(dataset, batch_size):
+    """
+    Estimate sample count from dataset cardinality.
+    Returns None if cardinality is unknown or infinite.
+    """
+    steps = tf.data.experimental.cardinality(dataset).numpy()
+    if steps < 0:
+        return None
+    return int(steps) * batch_size
 
 print("✓ Data generator function ready")
 
@@ -367,8 +357,16 @@ for scenario in scenarios:
             batch_size=config.BATCH_SIZE
         )
         
-        print(f"  Training samples: {train_gen.samples}")
-        print(f"  Validation samples: {val_gen.samples}")
+        train_samples = estimate_samples(train_gen, config.BATCH_SIZE)
+        val_samples = estimate_samples(val_gen, config.BATCH_SIZE)
+        if train_samples is not None:
+            print(f"  Training samples: {train_samples}")
+        else:
+            print("  Training samples: unknown")
+        if val_samples is not None:
+            print(f"  Validation samples: {val_samples}")
+        else:
+            print("  Validation samples: unknown")
         
         # Build model
         model = build_feature_extraction_model(
