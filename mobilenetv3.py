@@ -168,7 +168,7 @@ def preprocess_mobile(img, label):
 def create_data_generators(data_dir, train_ratio, img_size, batch_size):
     """
     Create train/validation datasets with specified split ratio.
-    Uses tf.data.Dataset instead of ImageDataGenerator.
+    Uses validation_split parameter for consistent splitting.
     
     Args:
         data_dir: Data directory path (should be config.DATASET_DIR)
@@ -179,9 +179,11 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
     Returns:
         train_ds, val_ds, class_names
     """
-    # Create full dataset from config.DATASET_DIR
-    full_train_ds_mobile = tf.keras.utils.image_dataset_from_directory(
+    # Create training dataset
+    train_ds_mobile = tf.keras.utils.image_dataset_from_directory(
         data_dir,
+        validation_split=1.0 - train_ratio,
+        subset='training',
         image_size=(img_size, img_size),
         batch_size=batch_size,
         label_mode='categorical',
@@ -189,17 +191,24 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
         seed=SEED
     )
     
-    # Get class names
-    class_names = full_train_ds_mobile.class_names
+    # Create validation dataset (same split, different subset)
+    val_ds_mobile = tf.keras.utils.image_dataset_from_directory(
+        data_dir,
+        validation_split=1.0 - train_ratio,
+        subset='validation',
+        image_size=(img_size, img_size),
+        batch_size=batch_size,
+        label_mode='categorical',
+        shuffle=False,
+        seed=SEED
+    )
     
-    # Calculate split sizes
-    val_size = int((1 - train_ratio) * len(full_train_ds_mobile))
-    train_ds_mobile = full_train_ds_mobile.take(len(full_train_ds_mobile) - val_size)
-    val_ds_mobile = full_train_ds_mobile.skip(len(full_train_ds_mobile) - val_size)
+    # Get class names
+    class_names = train_ds_mobile.class_names
     
     # Apply preprocessing
     train_ds = train_ds_mobile.map(preprocess_mobile, AUTOTUNE).shuffle(1000).prefetch(AUTOTUNE)
-    val_ds = val_ds_mobile.map(preprocess_mobile, AUTOTUNE)
+    val_ds = val_ds_mobile.map(preprocess_mobile, AUTOTUNE).prefetch(AUTOTUNE)
 
     return train_ds, val_ds, class_names
 
@@ -219,31 +228,28 @@ print("✓ Data generator function ready")
 # CODE CELL 5
 # ======================================================================
 
-# ------------------ 4. DEFINE 18 TRAINING SCENARIOS ------------------
+# ------------------ 4. DEFINE 10 TRAINING SCENARIOS ------------------
 
-# Based on the table: 3 scenarios × 2 optimizers × 3 learning rates = 18 experiments
+# Phase 1 Essential Fixes: 5 configs × 2 optimizers = 10 scenarios
+# Testing multiple LRs (5e-4, 1e-3, 2e-3) with focus on 1e-3 baseline
 scenarios = []
 
 scenario_configs = [
-    # Scenario 1: 90:10 split
-    {'split_ratio': 0.90, 'split_name': '90:10', 'lr': 0.1, 'epochs': 15},
-    {'split_ratio': 0.90, 'split_name': '90:10', 'lr': 0.01, 'epochs': 30},
-    {'split_ratio': 0.90, 'split_name': '90:10', 'lr': 0.001, 'epochs': 45},
+    # Scenario 1: 90:10 split - test multiple learning rates
+    {'split_ratio': 0.90, 'split_name': '90:10', 'lr': 5e-4, 'epochs': 30},   # Conservative
+    {'split_ratio': 0.90, 'split_name': '90:10', 'lr': 1e-3, 'epochs': 30},   # Recommended (matches notebook)
+    {'split_ratio': 0.90, 'split_name': '90:10', 'lr': 2e-3, 'epochs': 30},   # Aggressive
     
-    # Scenario 2: 80:20 split
-    {'split_ratio': 0.80, 'split_name': '80:20', 'lr': 0.1, 'epochs': 15},
-    {'split_ratio': 0.80, 'split_name': '80:20', 'lr': 0.01, 'epochs': 30},
-    {'split_ratio': 0.80, 'split_name': '80:20', 'lr': 0.001, 'epochs': 45},
+    # Scenario 2: 80:20 split - baseline with recommended LR
+    {'split_ratio': 0.80, 'split_name': '80:20', 'lr': 1e-3, 'epochs': 30},
     
-    # Scenario 3: 70:30 split
-    {'split_ratio': 0.70, 'split_name': '70:30', 'lr': 0.1, 'epochs': 15},
-    {'split_ratio': 0.70, 'split_name': '70:30', 'lr': 0.01, 'epochs': 30},
-    {'split_ratio': 0.70, 'split_name': '70:30', 'lr': 0.001, 'epochs': 45},
+    # Scenario 3: 70:30 split - baseline with recommended LR
+    {'split_ratio': 0.70, 'split_name': '70:30', 'lr': 1e-3, 'epochs': 30},
 ]
 
 optimizers_list = ['Adam', 'SGD']
 
-# Generate all 18 combinations
+# Generate all 10 combinations (5 configs × 2 optimizers)
 scenario_id = 1
 for sc in scenario_configs:
     for opt in optimizers_list:
@@ -645,7 +651,7 @@ if len(successful_results) > 0:
     
     # Recreate data generators for best scenario
     train_gen, val_gen, class_names = create_data_generators(
-        config.WORK_DIR,
+        config.DATASET_DIR,
         train_ratio=split_num,
         img_size=config.IMG_SIZE_MOBILE,
         batch_size=config.BATCH_SIZE
@@ -690,7 +696,7 @@ if len(successful_results) > 0:
     
     # Recreate validation dataset to extract labels (predict consumed the dataset)
     val_ds_for_labels = tf.keras.utils.image_dataset_from_directory(
-        config.WORK_DIR,
+        config.DATASET_DIR,
         validation_split=1.0 - split_num,
         subset='validation',
         seed=SEED,
