@@ -60,7 +60,7 @@ class Config:
     
     # Model architecture
     DROPOUT_RATE = 0.5
-    DENSE_UNITS = 128
+    DENSE_UNITS = 256
     NUM_CLASSES = 4  # Updated for 4 classes
     
     SEED = 42
