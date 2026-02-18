@@ -260,6 +260,10 @@ def main():
         y_pred_classes = np.argmax(y_pred, axis=1)
         
         # Get true labels
+        # Note: We create a separate dataset here (not reusing val_gen) because:
+        # 1. val_gen has preprocessing applied (preprocess_mobile) which we used for predictions
+        # 2. We need raw labels in sparse format for sklearn metrics
+        # 3. This approach matches the original notebook implementation
         val_ds_for_labels = tf.keras.utils.image_dataset_from_directory(
             config.DATASET_DIR,
             validation_split=1.0 - split_num,
