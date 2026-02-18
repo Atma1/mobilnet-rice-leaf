@@ -67,6 +67,8 @@ tf.get_logger().setLevel('ERROR')
 # ------------------ CONFIGURATION ------------------
 
 class Config:
+    # NOTE: These paths match the original notebook configuration.
+    # Modify these paths to match your environment.
     BASE_INPUT = '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/dataset/Rice_Leaf_AUG/Rice_Leaf_AUG'
     WORK_DIR = '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/work'
     OUTPUT_DIR = '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/work/results'
@@ -156,6 +158,7 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
     class_names = train_ds_mobile.class_names
     
     # Apply preprocessing
+    # Shuffle buffer size of 1000 is used to randomize training samples while keeping memory usage reasonable
     train_ds = train_ds_mobile.map(preprocess_mobile, AUTOTUNE).shuffle(1000).prefetch(AUTOTUNE)
     val_ds = val_ds_mobile.map(preprocess_mobile, AUTOTUNE).prefetch(AUTOTUNE)
 
@@ -218,7 +221,17 @@ def main():
         
         # Parse split ratio to get numeric value
         if isinstance(best_result['split_ratio'], str):
-            split_num = float(best_result['split_ratio'].split(':')[0]) / 100.0
+            try:
+                # Expected format: "XX:YY" (e.g., "90:10", "80:20")
+                split_parts = best_result['split_ratio'].split(':')
+                if len(split_parts) != 2:
+                    raise ValueError(f"Invalid split_ratio format: {best_result['split_ratio']}")
+                split_num = float(split_parts[0]) / 100.0
+            except (ValueError, IndexError) as e:
+                raise ValueError(
+                    f"Failed to parse split_ratio '{best_result['split_ratio']}'. "
+                    f"Expected format: 'XX:YY' (e.g., '90:10'). Error: {e}"
+                )
         else:
             split_num = best_result['split_ratio']
         
