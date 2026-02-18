@@ -6,6 +6,36 @@ This script generates classification reports and confusion matrices for the best
 performing scenario per split ratio based on validation accuracy and F1 score.
 
 It corresponds to section 7B from the mobilenetv3.ipynb notebook.
+
+USAGE:
+    python best_per_split_reports.py
+
+PREREQUISITES:
+    Before running this script, you must have:
+    1. Completed training using mobilenetv3.py or mobilenetv3.ipynb
+    2. Generated scenario_results.csv in the OUTPUT_DIR
+    3. Generated training_history.json in the OUTPUT_DIR
+    4. Saved model files in the MODELS_DIR
+
+INPUTS:
+    - scenario_results.csv: CSV file containing results from all training scenarios
+    - training_history.json: JSON file with detailed training history
+    - model_scenario_<id>_<split>_<optimizer>_lr<lr>.keras: Trained model files
+
+OUTPUTS:
+    For each best split scenario, generates:
+    - classification_report_split_<ratio>_scenario_<id>.csv
+    - confusion_matrix_split_<ratio>_scenario_<id>.png
+
+PROCESS:
+    1. Load scenario results from CSV
+    2. Rank scenarios by split ratio, validation accuracy, and F1 score
+    3. Select best performing scenario per split ratio
+    4. For each best scenario:
+       - Load the trained model
+       - Generate predictions on validation data
+       - Create classification report and save as CSV
+       - Create confusion matrix visualization and save as PNG
 """
 
 import os
