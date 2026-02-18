@@ -10,6 +10,7 @@ This project implements a comprehensive transfer learning experiment using **Mob
 
 - **`mobilenetv3.ipynb`** - Jupyter notebook with interactive training and visualization
 - **`mobilenetv3.py`** - Python script version (non-interactive, auto-saves all plots)
+- **`best_per_split_reports.py`** - Standalone script for generating best per split classification reports and confusion matrices
 
 ## Dataset
 
@@ -42,10 +43,24 @@ For each scenario, the following metrics are calculated and stored:
 jupyter notebook mobilenetv3.ipynb
 ```
 
-### Python Script
+### Python Script (Full Training)
 ```bash
 python mobilenetv3.py
 ```
+
+### Best Per Split Reports Script
+This script generates classification reports and confusion matrices for the best performing scenario per split ratio (based on validation accuracy and F1 score). 
+
+**Prerequisites:** You must run the main training script first to generate the required CSV and JSON files.
+
+```bash
+python best_per_split_reports.py
+```
+
+This script corresponds to section 7B from the notebook and requires:
+- `scenario_results.csv` - Results from all training scenarios
+- `training_history.json` - Detailed training history
+- Trained model files in the `models/` directory
 
 ## Output Files
 
@@ -56,3 +71,7 @@ The training process generates:
 - `top_3_training_curves.png` - Training curves visualization
 - `best_scenario_confusion_matrix.png` - Confusion matrix
 - Model files in `models/` directory
+
+The `best_per_split_reports.py` script additionally generates:
+- `classification_report_split_<ratio>_scenario_<id>.csv` - Classification report for each best split
+- `confusion_matrix_split_<ratio>_scenario_<id>.png` - Confusion matrix for each best split
