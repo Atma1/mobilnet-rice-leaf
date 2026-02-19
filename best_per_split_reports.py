@@ -262,10 +262,15 @@ def main():
         for _, y in val_gen:
             y_true_batches.append(y.numpy())
         y_true = np.concatenate(y_true_batches, axis=0)
-        y_true = np.argmax(y_true, axis=1)  # Convert one-hot to class indices
+        
+        # Convert to class indices (handle both one-hot and sparse formats)
+        if len(y_true.shape) > 1 and y_true.shape[1] > 1:
+            y_true = np.argmax(y_true, axis=1)
         
         # Recreate val_gen for predictions (since we just exhausted it)
         # Using the same parameters ensures identical class ordering
+        # Note: This reads the dataset twice (once for labels, once for predictions)
+        # but ensures correctness by using the same data loading path for both
         _, val_gen_for_pred, _ = create_data_generators(
             config.DATASET_DIR,
             train_ratio=split_num,
