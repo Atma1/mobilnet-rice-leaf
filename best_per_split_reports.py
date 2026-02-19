@@ -256,23 +256,26 @@ def main():
         print(f"\n✓ Loaded model for split {split_ratio}: {scenario_model_path}")
         print(f"  Class ordering: {class_names}")
         
-        # Make predictions and extract true labels from the same dataset
-        # This ensures class ordering is consistent between predictions and true labels
-        y_pred_batches = []
+        # Extract true labels from val_gen (iterate once to get all labels)
+        # This ensures we use the same class ordering as the predictions
         y_true_batches = []
-        for x, y in val_gen:
-            # Get predictions for this batch
-            y_pred_batches.append(model.predict(x, verbose=0))
-            # Get true labels for this batch (one-hot encoded from val_gen)
+        for _, y in val_gen:
             y_true_batches.append(y.numpy())
-        
-        # Concatenate all batches
-        y_pred = np.concatenate(y_pred_batches, axis=0)
         y_true = np.concatenate(y_true_batches, axis=0)
+        y_true = np.argmax(y_true, axis=1)  # Convert one-hot to class indices
         
-        # Convert to class indices
+        # Recreate val_gen for predictions (since we just exhausted it)
+        # Using the same parameters ensures identical class ordering
+        _, val_gen_for_pred, _ = create_data_generators(
+            config.DATASET_DIR,
+            train_ratio=split_num,
+            img_size=config.IMG_SIZE_MOBILE,
+            batch_size=config.BATCH_SIZE
+        )
+        
+        # Make predictions using the efficient model.predict method
+        y_pred = model.predict(val_gen_for_pred, verbose=0)
         y_pred_classes = np.argmax(y_pred, axis=1)
-        y_true = np.argmax(y_true, axis=1)
         
         # Validate that predictions and true labels have the same length
         if len(y_pred_classes) != len(y_true):
