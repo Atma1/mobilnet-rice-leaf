@@ -254,33 +254,34 @@ def main():
         # Load the model
         model = tf.keras.models.load_model(scenario_model_path)
         print(f"\n✓ Loaded model for split {split_ratio}: {scenario_model_path}")
+        print(f"  Class ordering: {class_names}")
         
-        # Make predictions
-        y_pred = model.predict(val_gen, verbose=0)
-        y_pred_classes = np.argmax(y_pred, axis=1)
-        
-        # Get true labels
-        # Note: We create a separate dataset here (not reusing val_gen) because:
-        # 1. val_gen has preprocessing applied (preprocess_mobile) which we used for predictions
-        # 2. We need raw labels in sparse format for sklearn metrics
-        # 3. This approach matches the original notebook implementation
-        val_ds_for_labels = tf.keras.utils.image_dataset_from_directory(
-            config.DATASET_DIR,
-            validation_split=1.0 - split_num,
-            subset='validation',
-            seed=SEED,
-            image_size=(config.IMG_SIZE_MOBILE, config.IMG_SIZE_MOBILE),
-            batch_size=config.BATCH_SIZE,
-            shuffle=False
-        )
-        
+        # Make predictions and extract true labels from the same dataset
+        # This ensures class ordering is consistent between predictions and true labels
+        y_pred_batches = []
         y_true_batches = []
-        for x, y in val_ds_for_labels:
+        for x, y in val_gen:
+            # Get predictions for this batch
+            y_pred_batches.append(model.predict(x, verbose=0))
+            # Get true labels for this batch (one-hot encoded from val_gen)
             y_true_batches.append(y.numpy())
+        
+        # Concatenate all batches
+        y_pred = np.concatenate(y_pred_batches, axis=0)
         y_true = np.concatenate(y_true_batches, axis=0)
-        if len(y_true.shape) > 1 and y_true.shape[1] > 1:
-            y_true = np.argmax(y_true, axis=1)
-        y_true = y_true[:len(y_pred_classes)]
+        
+        # Convert to class indices
+        y_pred_classes = np.argmax(y_pred, axis=1)
+        y_true = np.argmax(y_true, axis=1)
+        
+        # Validate that predictions and true labels have the same length
+        if len(y_pred_classes) != len(y_true):
+            raise ValueError(
+                f"Mismatch between predictions and true labels: "
+                f"{len(y_pred_classes)} predictions vs {len(y_true)} true labels"
+            )
+        
+        print(f"  Validated {len(y_true)} samples with consistent class ordering")
         
         # Generate classification report
         report_text = classification_report(
