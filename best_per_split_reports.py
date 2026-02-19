@@ -150,7 +150,7 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
         image_size=(img_size, img_size),
         batch_size=batch_size,
         label_mode='categorical',
-        shuffle=False,
+        shuffle=True,
         seed=SEED
     )
     
@@ -163,6 +163,20 @@ def create_data_generators(data_dir, train_ratio, img_size, batch_size):
     val_ds = val_ds_mobile.map(preprocess_mobile, AUTOTUNE).prefetch(AUTOTUNE)
 
     return train_ds, val_ds, class_names
+
+
+def count_images_per_class(data_dir):
+    """Count images per class directory on disk."""
+    counts = {}
+    for name in sorted(os.listdir(data_dir)):
+        class_dir = os.path.join(data_dir, name)
+        if not os.path.isdir(class_dir):
+            continue
+        total = 0
+        for _, _, files in os.walk(class_dir):
+            total += sum(1 for f in files if not f.startswith('.'))
+        counts[name] = total
+    return counts
 
 
 # ------------------ 7B. BEST PER SPLIT REPORTS (VAL ACC + F1) ------------------
@@ -255,32 +269,27 @@ def main():
         model = tf.keras.models.load_model(scenario_model_path)
         print(f"\n✓ Loaded model for split {split_ratio}: {scenario_model_path}")
         print(f"  Class ordering: {class_names}")
+        print(f"  Class counts on disk: {count_images_per_class(config.DATASET_DIR)}")
         
         # Extract true labels from val_gen (iterate once to get all labels)
         # This ensures we use the same class ordering as the predictions
-        y_true_batches = []
-        for _, y in val_gen:
-            y_true_batches.append(y.numpy())
-        y_true = np.concatenate(y_true_batches, axis=0)
+        # Replace the two-dataset approach with a single-pass approach
+
+        y_pred_list = []
+        y_true_list = []
+
+        for batch_index, (x_batch, y_batch) in enumerate(val_gen):
+            preds = model.predict(x_batch, verbose=0)
+            y_pred_list.append(np.argmax(preds, axis=1))
+            y_true_list.append(np.argmax(y_batch.numpy(), axis=1))  # val_gen uses label_mode='categorical'
+            if batch_index < 3:
+                batch_labels = np.argmax(y_batch.numpy(), axis=1)
+                unique, counts = np.unique(batch_labels, return_counts=True)
+                batch_summary = {class_names[i]: int(c) for i, c in zip(unique, counts)}
+                print(f"  Batch {batch_index + 1} label counts: {batch_summary}")
+        y_pred_classes = np.concatenate(y_pred_list, axis=0)
         
-        # Convert to class indices (handle both one-hot and sparse formats)
-        if len(y_true.shape) > 1 and y_true.shape[1] > 1:
-            y_true = np.argmax(y_true, axis=1)
-        
-        # Recreate val_gen for predictions (since we just exhausted it)
-        # Using the same parameters ensures identical class ordering
-        # Note: This reads the dataset twice (once for labels, once for predictions)
-        # but ensures correctness by using the same data loading path for both
-        _, val_gen_for_pred, _ = create_data_generators(
-            config.DATASET_DIR,
-            train_ratio=split_num,
-            img_size=config.IMG_SIZE_MOBILE,
-            batch_size=config.BATCH_SIZE
-        )
-        
-        # Make predictions using the efficient model.predict method
-        y_pred = model.predict(val_gen_for_pred, verbose=0)
-        y_pred_classes = np.argmax(y_pred, axis=1)
+        y_true = np.concatenate(y_true_list, axis=0)
         
         # Validate that predictions and true labels have the same length
         if len(y_pred_classes) != len(y_true):
@@ -290,6 +299,9 @@ def main():
             )
         
         print(f"  Validated {len(y_true)} samples with consistent class ordering")
+        label_counts = np.bincount(y_true, minlength=len(class_names))
+        label_summary = {class_names[i]: int(c) for i, c in enumerate(label_counts)}
+        print(f"  Validation label distribution: {label_summary}")
         
         # Generate classification report
         report_text = classification_report(
