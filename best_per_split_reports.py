@@ -71,9 +71,9 @@ class Config:
     # Modify these paths to match your environment.
     BASE_INPUT = '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/dataset/Rice_Leaf_AUG/Rice_Leaf_AUG'
     WORK_DIR = '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/work'
-    OUTPUT_DIR = '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/work/results'
-    MODELS_DIR = '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/work/models'
-    DATASET_DIR = '/mgpfs/home/asusanto/_scratch/mobilnet-rice-leaf/work/dataset'
+    OUTPUT_DIR = '/workspaces/mobilnet-rice-leaf/work/results'
+    MODELS_DIR = '/workspaces/mobilnet-rice-leaf/work/models'
+    DATASET_DIR = '/workspaces/mobilnet-rice-leaf/work/dataset'
     
     # Target classes for filtering (4 out of 10 classes)
     TARGET_CLASSES = ['bacterial_leaf_blight', 'brown_spot', 'leaf_blast', 'healthy_rice_leaf']
@@ -224,7 +224,7 @@ def main():
     
     # Generate reports for each best scenario
     for _, row in best_per_split.iterrows():
-        scenario_id = int(row['Scenario_ID'])
+        scenario_id = row['Scenario_ID']
         split_ratio = row['Split_Ratio']
         
         # Find the matching result in successful_results
@@ -359,6 +359,41 @@ def main():
         plt.savefig(fig_path, dpi=300, bbox_inches='tight')
         print(f"✓ Confusion matrix saved: {fig_path}")
         plt.close()
+
+        #generate training/validation accuracy and loss plots
+        history = best_result.get('history', {})
+        if history:
+            plt.figure(figsize=(12, 5))
+            
+            # Accuracy plot
+            plt.subplot(1, 2, 1)
+            plt.plot(history.get('accuracy', []), label='Train Accuracy')
+            plt.plot(history.get('val_accuracy', []), label='Val Accuracy')
+            plt.title(f"Accuracy - Best Split {split_ratio} (Scenario {scenario_id})", fontsize=13, fontweight='bold')
+            plt.xlabel('Epoch', fontsize=11)
+            plt.ylabel('Accuracy', fontsize=11)
+            plt.legend()
+            plt.grid(True)
+            
+            # Loss plot
+            plt.subplot(1, 2, 2)
+            plt.plot(history.get('loss', []), label='Train Loss')
+            plt.plot(history.get('val_loss', []), label='Val Loss')
+            plt.title(f"Loss - Best Split {split_ratio} (Scenario {scenario_id})", fontsize=13, fontweight='bold')
+            plt.xlabel('Epoch', fontsize=11)
+            plt.ylabel('Loss', fontsize=11)
+            plt.legend()
+            plt.grid(True)
+            
+            acc_loss_fig_path = os.path.join(
+                config.OUTPUT_DIR,
+                f"acc_loss_plots_split_{split_ratio.replace(':', '-')}_scenario_{scenario_id:02d}.png"
+            )
+            plt.savefig(acc_loss_fig_path, dpi=300, bbox_inches='tight')
+            print(f"✓ Accuracy and loss plots saved: {acc_loss_fig_path}")
+            plt.close()
+        else:
+            print("⚠ No training history available for this scenario, skipping accuracy/loss plots.")
         
         # Clean up
         del model
